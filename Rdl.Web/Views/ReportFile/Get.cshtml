@@ -1,0 +1,107 @@
+﻿@using Newtonsoft.Json
+@model Rdl.Web.Models.ReportFileViewModel
+
+@if (!string.IsNullOrEmpty(Model.ReportFile))
+{
+    <div id="drop"></div>
+}
+else
+{
+    <div class="alert alert-danger" role="alert">
+        <strong>No Report Found</strong>
+    </div>
+}
+
+
+@section Scripts {
+    @Scripts.Render("~/bundles/ractive")
+    @Scripts.Render("~/bundles/moment")
+    @Scripts.Render("~/bundles/datetimepicker")
+    @Scripts.Render("~/bundles/lodash")
+
+    @if (!string.IsNullOrEmpty(Model.ReportFile))
+    {
+        <script id='template' type='text/ractive'>
+            <div class="row">
+                {{#each params}}
+                    <div class="col-xs-4 form-group">
+                        <label for="param-{{.Name}}">{{.Prompt}}</label>
+                    </div>
+                    <div class="col-xs-8 form-group">
+                        <input 
+                            type="text" 
+                            id="param-{{.Name}}" 
+                            class="form-control {{#if .DataType==='DateTime'}}datetimepicker{{/if}}" 
+                            value="{{.value}}"
+                        />
+                    </div>
+                {{/each}}
+            </div>
+            {{#if errors.length}}
+                <div class="form-group">
+                    <div class="alert alert-danger" role="alert">
+                        <ul>
+                            {{#each errors}}
+                                <li>{{.}}</li>
+                            {{/each}}
+                        </ul>
+                    </div>
+                </div>
+            {{else}}
+                <div class="row">
+                    <div class="col-xs-12">
+                        <iframe src="/ReportView.aspx?name=@Model.ReportFile{{#each params}}&{{.Name}}={{.value}}{{/each}}" style="width: 100%; height: 500px; border: 0"></iframe>
+                    </div>
+                </div>
+            {{/if}}
+        </script>
+
+        <script>
+            var params = @Html.Raw(JsonConvert.SerializeObject(Model.Parameters));
+            _.each(params, function(p) {
+                if (p.DefaultValue && p.DefaultValue.Values && p.DefaultValue.Values.Value && p.DefaultValue.Values.Value.length) {
+                    var dfv = p.DefaultValue.Values.Value[0];
+                    p.value = dfv;
+                }
+            });
+
+            var errors = [];
+            var r = new Ractive({
+                el: "#drop",
+                template: "#template",
+                data: {
+                    params: params,
+                    errors: errors
+                },
+                lazy: true,
+                complete: function() {
+                    $('.datetimepicker').each(function() {
+                        $(this).datetimepicker({
+                            sideBySide: true,
+                            useCurrent: false,
+                            format: 'M/D/YYYY hh:mm A'
+                        });
+                        $(this).data("DateTimePicker").hide();
+                    });
+                }
+            });
+
+            function validate() {
+                errors = [];
+                r.set('errors', errors);
+
+                _.each(params, function(p) {
+                    if (!p.Nullable && !p.AllowBlank && !p.value) {
+                        errors.push(p.Prompt + ' must not be left blank');
+                    }
+                });
+                return errors.length <= 0;
+            }
+
+            r.observe('params[*].value', function() {
+                validate();
+            });
+        </script>
+    }
+}
+
